@@ -68,7 +68,13 @@ const Dashboard: React.FC<DashboardProps> = ({ patients }) => {
     lastAnalyzedCount.current = active.length;
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+         const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || (import.meta as any)?.env?.VITE_GEMINI_API_KEY;
+         if (!apiKey) {
+            alert("Chave da API Gemini não configurada.");
+            return;
+         }
+
+         const ai = new GoogleGenAI({ apiKey });
       const prompt = `Analise objetivamente esta unidade hospitalar para um gestor de enfermagem:
       INDICADORES:
       - Total de Pacientes: ${stats.total}

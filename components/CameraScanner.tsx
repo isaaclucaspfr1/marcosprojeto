@@ -62,7 +62,13 @@ const CameraScanner: React.FC<CameraScannerProps> = ({ onDataExtracted, onCancel
     stopCamera(); // Libera a câmera assim que captura
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || (import.meta as any)?.env?.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        alert("Chave da API Gemini não configurada.");
+        return;
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
