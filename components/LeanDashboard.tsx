@@ -3,7 +3,7 @@ import React from 'react';
 import { LeanPatient, LeanSpecialty } from '../types';
 import { LEAN_SPECIALTIES } from '../constants';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
-import { Printer, Download, Activity, AlertCircle, Clock, X } from 'lucide-react';
+import { Printer, Download, Activity, AlertCircle, Clock, X, Stethoscope, Sparkles } from 'lucide-react';
 
 interface LeanDashboardProps {
   patients: LeanPatient[];
@@ -123,21 +123,75 @@ const LeanDashboard: React.FC<LeanDashboardProps> = ({ patients, unit, onCancel 
          </div>
       </div>
 
-      {/* Relatório Impressão */}
-      <div className="hidden print:block p-10">
-         <h1 className="text-2xl font-black border-b-2 border-slate-900 pb-2 mb-8 uppercase text-center">Monitoramento Lean Hospitalar - {unit}</h1>
-         <div className="grid grid-cols-2 gap-8 mb-8">
-            <div className="border p-4 rounded-xl">
-               <p className="font-black text-xs uppercase mb-2">Resumo Geral</p>
-               <p>Total Monitorados: {patients.length}</p>
-               <p>Gargalo Atual: {gargalo?.name} ({gargalo?.val.toFixed(0)}m)</p>
+      {/* Relatório Impressão Padronizado */}
+      <div className="hidden print:block bg-white text-slate-900 p-0 font-sans" style={{ width: '210mm', minHeight: '297mm', margin: '0 auto', padding: '15mm' }}>
+         <style>{`
+           @page { size: A4; margin: 0; }
+           body { background: white !important; -webkit-print-color-adjust: exact; }
+           .print-header { border-bottom: 4px solid #0f172a; padding-bottom: 15px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+           .print-title { color: #1e3a8a; font-size: 36px; font-weight: 900; text-transform: uppercase; line-height: 1; letter-spacing: -1px; }
+           .print-footer { border-top: 2px solid #e2e8f0; padding-top: 15px; margin-top: 40px; display: flex; justify-content: space-between; align-items: center; }
+         `}</style>
+
+         <div className="print-header">
+            <div className="flex items-center gap-4">
+               <Activity className="w-14 h-14 text-[#1e3a8a]" />
+               <h1 className="print-title">HospFlow</h1>
             </div>
-            <div className="border p-4 rounded-xl">
-               <p className="font-black text-xs uppercase mb-2">Desempenho por Especialidade</p>
-               {specAvgs.map(s => <p key={s.name}>{s.name}: {s.avg} min</p>)}
+            <div className="text-right">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Monitoramento Lean Hospitalar</p>
+               <p className="font-bold text-sm text-slate-900">{unit}</p>
             </div>
          </div>
-         <p className="text-[10px] text-center text-slate-400 italic">Relatório gerado automaticamente pelo sistema HospFlow IA.</p>
+
+         <div className="grid grid-cols-2 gap-8 mb-8">
+            <div className="border border-slate-200 p-6 rounded-[2rem] bg-slate-50/30">
+               <p className="font-black text-[10px] uppercase text-slate-500 mb-4 tracking-widest">Resumo Geral</p>
+               <div className="space-y-2">
+                  <div className="flex justify-between border-b pb-1"><span className="text-[10px] font-bold uppercase text-slate-400">Total Monitorados</span><span className="font-black text-blue-900">{patients.length}</span></div>
+                  <div className="flex justify-between border-b pb-1"><span className="text-[10px] font-bold uppercase text-slate-400">Gargalo Atual</span><span className="font-black text-red-600 uppercase text-[10px]">{gargalo?.name}</span></div>
+                  <div className="flex justify-between pb-1"><span className="text-[10px] font-bold uppercase text-slate-400">Tempo Médio Gargalo</span><span className="font-black text-slate-800">{gargalo?.val.toFixed(0)} min</span></div>
+               </div>
+            </div>
+            <div className="border border-slate-200 p-6 rounded-[2rem] bg-slate-50/30">
+               <p className="font-black text-[10px] uppercase text-slate-500 mb-4 tracking-widest">Desempenho por Especialidade</p>
+               <div className="space-y-1">
+                  {specAvgs.map(s => (
+                    <div key={s.name} className="flex justify-between text-[9px] font-bold border-b border-slate-100 pb-1">
+                       <span className="text-slate-600 uppercase">{s.name}</span>
+                       <span className="text-blue-800">{s.avg} min</span>
+                    </div>
+                  ))}
+               </div>
+            </div>
+         </div>
+
+         <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] mb-8">
+            <div className="flex items-center gap-3 mb-4">
+               <Clock className="w-5 h-5 text-yellow-400" />
+               <h4 className="text-[10px] font-black uppercase tracking-widest">Análise de Eficiência Operacional</h4>
+            </div>
+            <p className="text-xs font-bold leading-relaxed text-blue-100 italic">
+               O processo de {gargalo?.name} foi identificado como o principal ponto de retenção do fluxo, com média de {gargalo?.val.toFixed(0)} minutos. Recomenda-se revisão imediata dos protocolos de {gargalo?.name} para otimização do Lead Time total da unidade.
+            </p>
+         </div>
+
+         <footer className="print-footer">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+               HospFlow • Gestão Estratégica Lean
+            </div>
+            <div className="flex items-center gap-2">
+               <div className="flex flex-col items-center justify-center w-10 h-10">
+                 <div className="relative">
+                   <Stethoscope className="w-7 h-7 text-emerald-600" />
+                   <div className="absolute -top-1 -right-1">
+                     <Sparkles className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                   </div>
+                 </div>
+                 <span className="text-[7px] font-black text-slate-900 mt-0.5">MA</span>
+               </div>
+            </div>
+         </footer>
       </div>
     </div>
   );

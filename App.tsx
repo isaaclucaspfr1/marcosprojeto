@@ -11,11 +11,10 @@ import PendencyView from './components/PendencyView';
 import ClearDataView from './components/ClearDataView';
 import CollaboratorManager from './components/CollaboratorManager';
 import ClinicalDecision from './components/ClinicalDecision';
-import LeanPatientForm from './components/LeanPatientForm';
-import LeanPatientList from './components/LeanPatientList';
-import LeanDashboard from './components/LeanDashboard';
 import AboutView from './components/AboutView';
-import BrandLogo from './components/BrandLogo';
+import LeanDashboard from './components/LeanDashboard';
+import LeanPatientList from './components/LeanPatientList';
+import LeanPatientForm from './components/LeanPatientForm';
 import { 
   UserPlus, 
   Users, 
@@ -25,16 +24,16 @@ import {
   Hospital,
   ChevronRight,
   Activity,
-  ShieldCheck,
-  Stethoscope,
   Eraser,
   UserCog,
   RefreshCcw,
   BrainCircuit,
-  LogOut,
+  CheckSquare,
   Info,
-  Sparkles,
-  CheckSquare
+  TrendingUp,
+  LayoutDashboard,
+  Stethoscope,
+  Sparkles
 } from 'lucide-react';
 
 const safeSave = (key: string, data: any) => {
@@ -55,11 +54,21 @@ const safeLoad = (key: string) => {
     return JSON.parse(decodedString);
   } catch (e) {
     console.warn(`Error loading ${key}, clearing storage:`, e);
-    localStorage.removeItem(key);
-    sessionStorage.removeItem(key);
     return null;
   }
 };
+
+const MarcosAraujoLogo = React.memo(({ size = "w-14 h-14" }: { size?: string }) => (
+  <div className={`flex flex-col items-center justify-center ${size} group`}>
+    <div className="relative">
+      <Stethoscope className="w-full h-full text-emerald-500" />
+      <div className="absolute -top-1 -right-1">
+        <Sparkles className="w-1/2 h-1/2 text-yellow-400 animate-pulse fill-yellow-400" />
+      </div>
+    </div>
+    <span className="text-[10px] font-black text-slate-800 mt-0.5 tracking-tighter">MA</span>
+  </div>
+));
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(() => {
@@ -97,14 +106,15 @@ const App: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
+  // Otimização: Debounce no salvamento para evitar travamentos em cada edição
   useEffect(() => {
     const timer = setTimeout(() => {
       safeSave('hospflow_patients_v5', patients);
-      safeSave('hospflow_lean_v5', leanPatients);
       safeSave('hospflow_collabs_v5', collaborators);
-    }, 2000);
+      safeSave('hospflow_lean_v5', leanPatients);
+    }, 1500);
     return () => clearTimeout(timer);
-  }, [patients, leanPatients, collaborators]);
+  }, [patients, collaborators, leanPatients]);
 
   useEffect(() => {
     const handleViewChange = (e: any) => setCurrentView(e.detail);
@@ -112,7 +122,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('change-view', handleViewChange);
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRole) {
       alert("ATENÇÃO: Por favor, selecione seu perfil (Técnico, Enfermeiro ou Coordenação) para continuar.");
@@ -123,12 +133,12 @@ const App: React.FC = () => {
       return c.login === username && c.role === selectedRole && !c.isDeleted;
     });
     if (foundIndex === -1) {
-      alert("USUÁRIO NÃO ENCONTRADO: O número informado não está cadastrado como " + (selectedRole === 'tecnico' ? 'Técnico' : selectedRole === 'enfermeiro' ? 'Enfermeiro' : 'Coordenação') + ".");
+      alert("USUÁRIO NÃO ENCONTRADO: Verifique os dados ou procure a coordenação.");
       return;
     }
     const found = collaborators[foundIndex];
     if (found.isBlocked) {
-      alert("USUÁRIO BLOQUEADO: Limite de tentativas excedido. Procure a Coordenação para resetar sua senha.");
+      alert("USUÁRIO BLOQUEADO: Limite de tentativas excedido. Procure o Enfermeiro ou a Coordenação para resetar sua senha.");
       return;
     }
     if (found.password === password) {
@@ -142,7 +152,6 @@ const App: React.FC = () => {
       }
       const authUser: User = { id: found.id, username: found.login, role: selectedRole, name: found.name };
       sessionStorage.setItem('hospflow_session_v5', btoa(encodeURIComponent(JSON.stringify(authUser))));
-      localStorage.removeItem('hospflow_session_v5');
       setUser(authUser);
       setCurrentView('UNIT_SELECTION');
       setUsername('');
@@ -153,15 +162,17 @@ const App: React.FC = () => {
       const blocked = attempts >= 3;
       updatedCollabs[foundIndex] = { ...found, failedAttempts: attempts, isBlocked: blocked };
       setCollaborators(updatedCollabs);
-      if (blocked) alert("USUÁRIO BLOQUEADO: Você errou a senha 3 vezes. Procure a Coordenação.");
-      else alert(`SENHA INCORRETA: Verifique sua senha numérica. Tentativa ${attempts} de 3. Após 3 erros o usuário será bloqueado.`);
+      if (blocked) alert("SENHA BLOQUEADA: Você errou a senha 3 vezes. Procure seu superior para resetar sua senha.");
+      else alert(`SENHA INCORRETA: Tentativa ${attempts} de 3. Após 3 erros o usuário será bloqueado.`);
     }
-  };
+  }, [collaborators, username, password, selectedRole]);
 
-  const handleUpdatePassword = (e: React.FormEvent) => {
+  const handleUpdatePassword = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!/^\d+$/.test(newPassword)) { alert("A senha deve conter apenas números."); return; }
+    if (newPassword.length > 6) { alert("A nova senha deve ter no máximo 6 dígitos."); return; }
     if (newPassword === '1234') { alert("Você não pode usar a senha padrão como sua nova senha."); return; }
+    
     if (tempAuthUser) {
       const updatedCollabs = collaborators.map(c => 
         c.id === tempAuthUser.id ? { ...c, password: newPassword, failedAttempts: 0, isBlocked: false } : c
@@ -171,13 +182,13 @@ const App: React.FC = () => {
       sessionStorage.setItem('hospflow_session_v5', btoa(encodeURIComponent(JSON.stringify(authUser))));
       setUser(authUser);
       setTempAuthUser(null);
+      setNewPassword('');
       setCurrentView('UNIT_SELECTION');
       alert("Senha pessoal definida com sucesso!");
     }
-  };
+  }, [collaborators, newPassword, tempAuthUser]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('hospflow_session_v5');
+  const handleLogout = useCallback(() => {
     sessionStorage.removeItem('hospflow_session_v5');
     setUser(null);
     setSelectedUnit(null);
@@ -185,7 +196,7 @@ const App: React.FC = () => {
     setSelectedRole(null);
     setUsername('');
     setPassword('');
-  };
+  }, []);
 
   const addPatient = useCallback((p: Partial<Patient>) => {
     const isUpa = p.status === 'Transferência UPA';
@@ -200,7 +211,7 @@ const App: React.FC = () => {
       transferDestinationSector: isAutoTransfer ? p.status : undefined,
       transferDestinationBed: isUpa ? 'UPA' : (isAutoTransfer ? 'AGUARDANDO' : undefined),
       isTransferred: false,
-      isNew: true // Marca como novo para notificação do enfermeiro/coord
+      isNew: true
     };
     setPatients(prev => [newP, ...prev].sort((a, b) => a.name.localeCompare(b.name)));
   }, [user]);
@@ -232,7 +243,7 @@ const App: React.FC = () => {
         const newPatientsCount = patients.filter(p => p.isNew && !p.isTransferred).length;
 
         const badge = (count: number, color: string) => count > 0 ? (
-          <span className={`absolute top-2 right-2 w-5 h-5 ${count > 0 ? color : ''} text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse`}>
+          <span className={`absolute top-2 right-2 w-5 h-5 ${count > 5 ? 'bg-red-600' : color} text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse`}>
             {count}
           </span>
         ) : null;
@@ -289,16 +300,18 @@ const App: React.FC = () => {
               <span className="text-xs font-bold text-slate-700">Pacientes Finalizados</span>
             </button>
           ),
-          monitoramentoLean: (
-            <button key="lean" onClick={() => setCurrentView('LEAN_MENU')} className={btnBase}>
-              <Activity className="w-8 h-8 text-indigo-500 mb-2" />
-              <span className="text-xs font-bold text-slate-700">Monitoramento Lean</span>
-            </button>
-          ),
           equipes: (
             <button key="equipes" onClick={() => setCurrentView('COLLABORATORS')} className={btnBase}>
               <UserCog className="w-8 h-8 text-slate-800 mb-2" />
-              <span className="text-xs font-bold text-slate-700">Equipe</span>
+              <span className="text-xs font-bold text-slate-700">
+                {user?.role === 'coordenacao' ? 'Usuários' : (user?.role === 'enfermeiro' ? 'Consultar Usuários' : 'Equipe')}
+              </span>
+            </button>
+          ),
+          leanMonitoramento: (
+            <button key="lean" onClick={() => setCurrentView('LEAN_MENU')} className={btnBase}>
+              <TrendingUp className="w-8 h-8 text-indigo-600 mb-2" />
+              <span className="text-xs font-bold text-slate-700">Monitoramento Lean</span>
             </button>
           ),
           mudarUnidade: (
@@ -325,12 +338,12 @@ const App: React.FC = () => {
           menuButtons.decisaoClinica,
           menuButtons.listaPacientes,
           menuButtons.dashboard,
+          menuButtons.leanMonitoramento,
           menuButtons.novoPaciente,
           menuButtons.pendencias,
           menuButtons.transferirPacientes,
           menuButtons.transferencias,
           menuButtons.pacientesFinalizados,
-          menuButtons.monitoramentoLean,
           menuButtons.equipes,
           menuButtons.mudarUnidade,
           menuButtons.limparDados,
@@ -343,10 +356,10 @@ const App: React.FC = () => {
           menuButtons.novoPaciente,
           menuButtons.transferirPacientes,
           menuButtons.transferencias,
+          menuButtons.leanMonitoramento,
           menuButtons.pendencias,
           menuButtons.dashboard,
           menuButtons.pacientesFinalizados,
-          menuButtons.monitoramentoLean,
           menuButtons.equipes,
           menuButtons.mudarUnidade,
           menuButtons.limparDados,
@@ -360,7 +373,6 @@ const App: React.FC = () => {
           menuButtons.pendencias,
           menuButtons.pacientesFinalizados,
           menuButtons.dashboard,
-          menuButtons.monitoramentoLean,
           menuButtons.mudarUnidade,
           menuButtons.sobreApp
         ];
@@ -402,43 +414,67 @@ const App: React.FC = () => {
                     <input required type="password" inputMode="numeric" placeholder="SENHA" autoComplete="off" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold" value={password} onChange={e => setPassword(e.target.value.replace(/\D/g, ''))} />
                   </div>
                 </div>
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                  <p className="text-[9px] font-black text-blue-600 uppercase text-center leading-relaxed">Sessão Segura: O sistema desconectará automaticamente ao fechar a aba ou navegador.</p>
-                </div>
                 <button type="submit" className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700 active:scale-95 transition-all uppercase text-xs tracking-widest">Acessar Sistema</button>
               </form>
             </div>
-            <div className="flex flex-col items-center mt-2">
-              <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-3">Criado por:</p>
-              <BrandLogo />
+            
+            <div className="flex flex-col items-center gap-2 mt-2">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Criado e Desenvolvido por:</span>
+              <MarcosAraujoLogo size="w-16 h-16" />
             </div>
           </div>
         );
 
-      case 'CHANGE_PASSWORD':
+      case 'LEAN_MENU':
         return (
-          <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 flex-col">
-            <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200">
-               <div className="bg-slate-900 p-10 text-center">
-                  <RefreshCcw className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin-slow" />
-                  <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Nova Senha Pessoal</h2>
-                  <p className="text-slate-400 text-[10px] font-black uppercase mt-2 tracking-widest">Segurança Obrigatória</p>
-               </div>
-               <form onSubmit={handleUpdatePassword} className="p-8 space-y-6">
-                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl">
-                     <p className="text-[10px] font-black text-amber-800 uppercase leading-relaxed text-center">
-                        Detectamos que você está usando a senha padrão. Para sua segurança, defina uma nova senha numérica agora.
-                     </p>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Digite sua nova senha (Apenas números)</label>
-                    <input required autoFocus type="password" inputMode="numeric" placeholder="NOVA SENHA" className="w-full px-5 py-5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-black text-center text-2xl tracking-[0.5em]" value={newPassword} onChange={e => setNewPassword(e.target.value.replace(/\D/g, ''))} />
-                  </div>
-                  <button type="submit" className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700 active:scale-95 transition-all uppercase text-xs tracking-widest">Salvar e Acessar</button>
-               </form>
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <button onClick={() => setCurrentView('LEAN_CADASTRO')} className="bg-white p-8 rounded-[2.5rem] border shadow-sm hover:shadow-xl transition-all flex flex-col items-center group">
+                 <div className="p-4 bg-blue-600 text-white rounded-3xl mb-4 group-hover:scale-110 transition-transform">
+                    <UserPlus className="w-8 h-8" />
+                 </div>
+                 <span className="font-black text-slate-700 uppercase tracking-widest text-xs">Novo Cadastro Lean</span>
+              </button>
+              <button onClick={() => setCurrentView('LEAN_LIST')} className="bg-white p-8 rounded-[2.5rem] border shadow-sm hover:shadow-xl transition-all flex flex-col items-center group">
+                 <div className="p-4 bg-indigo-600 text-white rounded-3xl mb-4 group-hover:scale-110 transition-transform">
+                    <LayoutDashboard className="w-8 h-8" />
+                 </div>
+                 <span className="font-black text-slate-700 uppercase tracking-widest text-xs">Lista de Monitoramento</span>
+              </button>
+              <button onClick={() => setCurrentView('LEAN_NURSE_SUMMARY')} className="bg-white p-8 rounded-[2.5rem] border shadow-sm hover:shadow-xl transition-all flex flex-col items-center group">
+                 <div className="p-4 bg-emerald-600 text-white rounded-3xl mb-4 group-hover:scale-110 transition-transform">
+                    <BarChart3 className="w-8 h-8" />
+                 </div>
+                 <span className="font-black text-slate-700 uppercase tracking-widest text-xs">Dashboard Lean</span>
+              </button>
             </div>
+            <button onClick={() => setCurrentView('MAIN_MENU')} className="w-full py-4 text-slate-400 font-bold uppercase text-xs tracking-widest">Voltar ao Menu Principal</button>
           </div>
         );
+
+      case 'LEAN_CADASTRO': return <LeanPatientForm onSave={(p) => { setLeanPatients([...leanPatients, p]); setCurrentView('LEAN_LIST'); }} onCancel={() => setCurrentView('LEAN_MENU')} />;
+      case 'LEAN_LIST': return <LeanPatientList patients={leanPatients} onUpdate={setLeanPatients} onCancel={() => setCurrentView('LEAN_MENU')} />;
+      case 'LEAN_NURSE_SUMMARY': return <LeanDashboard patients={leanPatients} unit={selectedUnit || ''} onCancel={() => setCurrentView('LEAN_MENU')} />;
+      case 'CHANGE_PASSWORD': return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 flex-col">
+          <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200">
+             <div className="bg-slate-900 p-10 text-center">
+                <RefreshCcw className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Nova Senha Pessoal</h2>
+             </div>
+             <form onSubmit={handleUpdatePassword} className="p-8 space-y-6">
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl text-center">
+                   <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Defina sua nova senha numérica pessoal (máximo de 6 dígitos).</p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nova Senha (Só Números)</label>
+                  <input required autoFocus type="password" inputMode="numeric" maxLength={6} placeholder="NOVA SENHA" className="w-full px-5 py-5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-black text-center text-2xl tracking-[0.5em]" value={newPassword} onChange={e => setNewPassword(e.target.value.replace(/\D/g, ''))} />
+                </div>
+                <button type="submit" className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700 transition-all uppercase text-xs tracking-widest">Salvar e Acessar</button>
+             </form>
+          </div>
+        </div>
+      );
 
       case 'UNIT_SELECTION':
         return (
@@ -456,7 +492,7 @@ const App: React.FC = () => {
         );
 
       case 'PATIENT_LIST': return <PatientList patients={patients} role={user?.role || 'tecnico'} onDeletePatients={deletePatients} onUpdatePatients={updatePatients} onEdit={p => { setScannedData(p); setCurrentView('NEW_PATIENT'); }} />;
-      case 'DASHBOARD': return <Dashboard patients={patients} />;
+      case 'DASHBOARD': return <Dashboard patients={patients} role={user?.role || 'tecnico'} />;
       case 'CLINICAL_DECISION': return <ClinicalDecision patients={patients} onUpdatePatient={updatePatient} />;
       case 'INITIATE_TRANSFER': return <InitiateTransfer patients={patients} onUpdatePatient={updatePatient} onCancel={() => setCurrentView('MAIN_MENU')} />;
       case 'TRANSFERS': return <TransferManager role={user?.role || 'tecnico'} patients={patients} onUpdatePatient={updatePatient} />;

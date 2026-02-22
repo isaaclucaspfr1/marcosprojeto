@@ -1,6 +1,6 @@
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Patient } from '../types';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { Patient, Role } from '../types';
 import { 
   Printer, 
   Activity, 
@@ -10,23 +10,28 @@ import {
   AlertCircle, 
   Bed, 
   Lightbulb, 
-  Stethoscope,
   PieChart as PieChartIcon,
   BarChart3,
-  Clock
+  Clock,
+  TrendingUp,
+  ChevronRight,
+  Stethoscope
 } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, PieChart, Pie } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Legend } from 'recharts';
 import { SPECIALTIES } from '../constants';
 
 interface DashboardProps {
   patients: Patient[];
+  role?: Role;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ patients }) => {
+const Dashboard: React.FC<DashboardProps> = ({ patients, role }) => {
   const [aiAnalysis, setAiAnalysis] = useState<{ summary: string; improvements: string[] }>({ summary: '', improvements: [] });
   const [loadingAi, setLoadingAi] = useState(false);
   const lastAnalyzedCount = useRef<number>(-1);
+
+  const isAuthorizedToPrint = role === 'enfermeiro' || role === 'coordenacao';
 
   const active = useMemo(() => patients.filter(p => !p.isTransferred), [patients]);
   
@@ -46,17 +51,18 @@ const Dashboard: React.FC<DashboardProps> = ({ patients }) => {
   const specialtyData = useMemo(() => {
     return SPECIALTIES.map(s => ({
       name: s,
-      value: active.filter(p => p.specialty === s).length
-    })).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+      pacientes: active.filter(p => p.specialty === s).length
+    })).filter(d => d.pacientes > 0).sort((a, b) => b.pacientes - a.pacientes);
   }, [active]);
 
   const statusPieData = useMemo(() => [
-    { name: 'Internados', value: stats.internados, color: '#2563eb' },
+    { name: 'Internados', value: stats.internados, color: '#1e40af' },
     { name: 'Observação', value: stats.observacao, color: '#4f46e5' },
     { name: 'Reavaliação', value: stats.reavaliacao, color: '#f59e0b' }
-  ], [stats]);
+  ].filter(d => d.value > 0), [stats]);
 
-  const generateAiSummary = async () => {
+  // Fix: Added useCallback to React imports and defined generateAiSummary using it.
+  const generateAiSummary = useCallback(async () => {
     if (active.length === lastAnalyzedCount.current || active.length === 0) return;
     setLoadingAi(true);
     lastAnalyzedCount.current = active.length;
@@ -64,17 +70,17 @@ const Dashboard: React.FC<DashboardProps> = ({ patients }) => {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const prompt = `Analise objetivamente esta unidade hospitalar para um gestor de enfermagem:
-      INDICADORES:
-      - Total de Pacientes: ${stats.total}
-      - Status: ${stats.internados} Internados, ${stats.observacao} em Obs, ${stats.reavaliacao} em Reaval.
-      - Acomodação: ${stats.macas} em Macas, ${stats.cadeiras} em Cadeiras.
-      - Pendências Gerais: ${stats.pendencias}.
-      - Gargalos de Fluxo (Exames/Prescrição): ${stats.gargalos}.
+      INDICADORES ATUAIS:
+      - Total de Pacientes no Setor: ${stats.total}
+      - Perfil de Status: ${stats.internados} Internados, ${stats.observacao} em Observação, ${stats.reavaliacao} em Reavaliação.
+      - Acomodação Crítica: ${stats.macas} em Macas, ${stats.cadeiras} em Cadeiras.
+      - Pendências de Segurança/Fluxo: ${stats.pendencias}.
+      - Gargalos Operacionais: ${stats.gargalos}.
       
-      Gere um JSON com o seguinte formato:
+      Forneça um JSON estruturado:
       {
-        "summary": "Um relatório técnico e claro (parágrafo único) resumindo a gravidade da ocupação e fluxos.",
-        "improvements": ["Sugestão 1 breve de agilidade", "Sugestão 2 breve", "Sugestão 3 breve"]
+        "summary": "Resumo técnico (um parágrafo) sobre a carga de trabalho e segurança do paciente.",
+        "improvements": ["Ação 1 de fluxo", "Ação 2 de segurança", "Ação 3 operacional"]
       }`;
 
       const response = await ai.models.generateContent({
@@ -93,39 +99,46 @@ const Dashboard: React.FC<DashboardProps> = ({ patients }) => {
       });
       setAiAnalysis(JSON.parse(response.text || '{}'));
     } catch (e) {
-      setAiAnalysis({ summary: 'Análise indisponível no momento.', improvements: [] });
+      setAiAnalysis({ summary: 'Análise estratégica temporariamente indisponível.', improvements: [] });
     } finally {
       setLoadingAi(false);
     }
-  };
+  }, [active.length, stats]);
 
   useEffect(() => {
-    const timer = setTimeout(() => generateAiSummary(), 1000);
+    const timer = setTimeout(() => generateAiSummary(), 2000);
     return () => clearTimeout(timer);
-  }, [active.length]);
+  }, [active.length, generateAiSummary]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex justify-between items-center no-print">
-         <div>
-            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Painel Gerencial HospFlow</h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Monitoramento de Fluxo e Ocupação em Tempo Real</p>
+         <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg">
+               <TrendingUp className="w-6 h-6" />
+            </div>
+            <div>
+               <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Gestão Operacional HospFlow</h2>
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dashboards e Indicadores em Tempo Real</p>
+            </div>
          </div>
-         <button onClick={() => window.print()} className="px-6 py-3 bg-slate-900 text-white font-black rounded-2xl flex items-center gap-2 shadow-xl hover:bg-black transition-all active:scale-95 text-xs uppercase tracking-widest">
-            <Printer className="w-5 h-5" /> Imprimir Relatório
-         </button>
+         {isAuthorizedToPrint && (
+           <button onClick={() => window.print()} className="px-6 py-4 bg-slate-950 text-white font-black rounded-2xl flex items-center gap-3 shadow-2xl hover:bg-black transition-all active:scale-95 text-xs uppercase tracking-widest">
+              <Printer className="w-5 h-5" /> Imprimir Relatório
+           </button>
+         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 no-print">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 no-print">
         {[
-          { label: 'Ocupação Total', val: stats.total, color: 'bg-slate-900 text-white', icon: Users },
-          { label: 'Internados', val: stats.internados, color: 'bg-blue-600 text-white', icon: Bed },
-          { label: 'Observações', val: stats.observacao, color: 'bg-indigo-600 text-white', icon: Activity },
-          { label: 'Reavaliações', val: stats.reavaliacao, color: 'bg-amber-500 text-white', icon: Clock },
-          { label: 'Pendências', val: stats.pendencias, color: 'bg-red-600 text-white', icon: AlertCircle }
+          { label: 'Ocupação', val: stats.total, color: 'bg-slate-900 text-white', icon: Users },
+          { label: 'Internados', val: stats.internados, color: 'bg-blue-800 text-white', icon: Bed },
+          { label: 'Obs.', val: stats.observacao, color: 'bg-indigo-600 text-white', icon: Activity },
+          { label: 'Reaval.', val: stats.reavaliacao, color: 'bg-amber-500 text-white', icon: Clock },
+          { label: 'Críticos', val: stats.pendencias, color: 'bg-red-600 text-white', icon: AlertCircle }
         ].map(card => (
-          <div key={card.label} className={`${card.color} p-5 rounded-[2rem] shadow-lg flex flex-col items-center text-center transition-transform hover:scale-[1.02]`}>
-             <card.icon className="w-6 h-6 mb-2 opacity-60" />
+          <div key={card.label} className={`${card.color} p-6 rounded-[2.5rem] shadow-xl flex flex-col items-center text-center transition-all hover:-translate-y-1`}>
+             <card.icon className="w-6 h-6 mb-2 opacity-40" />
              <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-80">{card.label}</p>
              <h3 className="text-3xl font-black">{card.val}</h3>
           </div>
@@ -133,19 +146,22 @@ const Dashboard: React.FC<DashboardProps> = ({ patients }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print">
-        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
-           <div className="flex items-center gap-2 mb-6">
-              <BarChart3 className="w-4 h-4 text-blue-600" />
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pacientes por Especialidade</h4>
+        <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+           <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                 <BarChart3 className="w-5 h-5 text-blue-600" />
+                 <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Demanda por Especialidade</h4>
+              </div>
            </div>
-           <div className="h-[200px]">
+           <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
-                 <BarChart data={specialtyData} layout="vertical">
+                 <BarChart data={specialtyData} layout="vertical" margin={{ left: 20 }}>
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" hide />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    <YAxis dataKey="name" type="category" width={100} fontSize={10} fontWeight={900} textAnchor="end" tick={{ fill: '#475569' }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                    <Bar dataKey="pacientes" radius={[0, 8, 8, 0]} barSize={20}>
                        {specialtyData.map((entry, index) => (
-                         <Cell key={`cell-${index}`} fill={index === 0 ? '#2563eb' : '#94a3b8'} />
+                         <Cell key={`cell-${index}`} fill={index === 0 ? '#1e40af' : '#64748b'} />
                        ))}
                     </Bar>
                  </BarChart>
@@ -153,84 +169,129 @@ const Dashboard: React.FC<DashboardProps> = ({ patients }) => {
            </div>
         </div>
 
-        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
-           <div className="flex items-center gap-2 mb-6">
-              <PieChartIcon className="w-4 h-4 text-indigo-600" />
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status Geral da Unidade</h4>
+        <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+           <div className="flex items-center gap-3 mb-8">
+              <PieChartIcon className="w-5 h-5 text-indigo-600" />
+              <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Distribuição de Status</h4>
            </div>
-           <div className="h-[200px]">
+           <div className="h-[250px] flex items-center">
               <ResponsiveContainer width="100%" height="100%">
                  <PieChart>
-                    <Pie data={statusPieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                    <Pie data={statusPieData} innerRadius={70} outerRadius={95} paddingAngle={8} dataKey="value">
                        {statusPieData.map((entry, index) => (
-                         <Cell key={`cell-${index}`} fill={entry.color} />
+                         <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
                        ))}
                     </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }} />
                  </PieChart>
               </ResponsiveContainer>
            </div>
         </div>
       </div>
 
-      <div className="hidden print:block bg-white text-slate-900 p-0 font-sans" style={{ width: '210mm', minHeight: '297mm', margin: '0 auto' }}>
+      <div className="bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl no-print">
+         <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+            <Sparkles className="w-48 h-48" />
+         </div>
+         <div className="relative z-10 space-y-8">
+            <div className="flex items-center gap-4">
+               <div className="w-14 h-14 bg-blue-600 rounded-3xl flex items-center justify-center shadow-lg">
+                  <Sparkles className="w-8 h-8 text-white animate-pulse" />
+               </div>
+               <div>
+                  <h3 className="text-2xl font-black uppercase tracking-tight">Análise Estratégica IA</h3>
+                  <p className="text-blue-400 text-[10px] font-black uppercase tracking-widest">Processamento Avançado de Fluxo Assistencial</p>
+               </div>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+               <div className="lg:col-span-2 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 backdrop-blur-sm">
+                  <p className="text-blue-400 text-[9px] font-black uppercase tracking-widest mb-3">Relatório Situacional</p>
+                  {loadingAi ? (
+                    <div className="flex items-center gap-3 text-slate-500 py-4">
+                       <Loader2 className="w-6 h-6 animate-spin" />
+                       <p className="text-sm font-bold animate-pulse">PROCESSANDO DADOS DA UNIDADE...</p>
+                    </div>
+                  ) : (
+                    <p className="text-lg font-bold text-slate-100 leading-relaxed italic">"{aiAnalysis.summary || 'Aguardando indicadores para análise...'}"</p>
+                  )}
+               </div>
+               <div className="space-y-4">
+                  <p className="text-emerald-400 text-[9px] font-black uppercase tracking-widest mb-3 ml-2">Sugestões de Agilidade</p>
+                  {aiAnalysis.improvements.map((tip, i) => (
+                    <div key={i} className="bg-emerald-500/10 p-5 rounded-2xl border border-emerald-500/20 flex items-center gap-3 transition-transform hover:scale-105">
+                       <Lightbulb className="w-5 h-5 text-emerald-400 shrink-0" />
+                       <p className="text-[11px] font-black text-emerald-100 uppercase leading-tight">{tip}</p>
+                    </div>
+                  ))}
+               </div>
+            </div>
+         </div>
+      </div>
+
+      {/* Relatório Impresso Padronizado (HospFlow Estilo Consolidado) */}
+      <div className="hidden print:block bg-white text-slate-900 p-0 font-sans" style={{ width: '210mm', minHeight: '297mm', margin: '0 auto', padding: '15mm' }}>
         <style>{`
-          @page { size: A4; margin: 10mm; }
-          @media print {
-            body { background: white !important; -webkit-print-color-adjust: exact; }
-            .print-card { border: 1.5px solid !important; }
-          }
+          @page { size: A4; margin: 0; }
+          body { background: white !important; -webkit-print-color-adjust: exact; }
+          .print-header { border-bottom: 4px solid #0f172a; padding-bottom: 15px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+          .print-title { color: #1e3a8a; font-size: 36px; font-weight: 900; text-transform: uppercase; line-height: 1; letter-spacing: -1px; }
+          .print-card { border: 1.5px solid #cbd5e1; border-radius: 20px; padding: 20px; text-align: center; background: #f8fafc !important; }
+          .print-footer { border-top: 2px solid #e2e8f0; padding-top: 15px; margin-top: 40px; display: flex; justify-content: space-between; align-items: center; }
         `}</style>
         
-        <header className="flex justify-between items-center border-b-2 border-slate-200 pb-4 mb-6">
-          <div className="flex items-center gap-3">
-            <Activity className="w-10 h-10 text-blue-600" />
-            <div>
-              <h1 className="text-xl font-black uppercase text-slate-900">Painel Gerencial HospFlow</h1>
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Monitoramento de Fluxo e Ocupação em Tempo Real</p>
-            </div>
+        <div className="print-header">
+          <div className="flex items-center gap-4">
+            <Activity className="w-14 h-14 text-[#1e3a8a]" />
+            <h1 className="print-title">HospFlow</h1>
           </div>
           <div className="text-right">
-            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Emitido em</p>
-            <p className="text-[10px] font-bold">{new Date().toLocaleDateString('pt-BR')} {new Date().toLocaleTimeString('pt-BR')}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Indicadores Operacionais e de Fluxo</p>
+            <p className="font-bold text-sm text-slate-900">{new Date().toLocaleDateString('pt-BR')} - {new Date().toLocaleTimeString('pt-BR')}</p>
           </div>
-        </header>
+        </div>
 
-        <section className="flex gap-2 mb-6">
+        <section className="grid grid-cols-4 gap-4 mb-10">
           {[
-            { label: 'Ocupação Total', val: stats.total, border: 'border-slate-800', bg: 'bg-slate-50', text: 'text-slate-900' },
-            { label: 'Internados', val: stats.internados, border: 'border-blue-600', bg: 'bg-blue-50', text: 'text-blue-700' },
-            { label: 'Observações', val: stats.observacao, border: 'border-indigo-600', bg: 'bg-indigo-50', text: 'text-indigo-700' },
-            { label: 'Reavaliações', val: stats.reavaliacao, border: 'border-amber-500', bg: 'bg-amber-50', text: 'text-amber-700' },
-            { label: 'Pendências', val: stats.pendencias, border: 'border-red-600', bg: 'bg-red-50', text: 'text-red-700' }
+            { label: 'Ocupação Total', val: stats.total },
+            { label: 'Internados', val: stats.internados },
+            { label: 'Observação', val: stats.observacao },
+            { label: 'Pendências Críticas', val: stats.pendencias }
           ].map(card => (
-            <div key={card.label} className={`flex-1 ${card.bg} ${card.border} border-2 p-3 rounded-2xl text-center print-card`}>
-              <p className="text-[7px] font-black uppercase text-slate-500 mb-1">{card.label}</p>
-              <h3 className={`text-xl font-black ${card.text}`}>{card.val}</h3>
+            <div key={card.label} className="print-card">
+              <p className="text-[8px] font-black uppercase text-slate-500 mb-1">{card.label}</p>
+              <h3 className="text-2xl font-black text-blue-900">{card.val}</h3>
             </div>
           ))}
         </section>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="border border-slate-200 rounded-3xl p-4 bg-slate-50/30">
-            <h4 className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-4">Pacientes por Especialidade</h4>
-            <div className="space-y-1.5">
-              {specialtyData.slice(0, 8).map(s => (
-                <div key={s.name} className="flex justify-between items-center text-[9px] font-bold">
-                  <span className="text-slate-600">{s.name}</span>
-                  <span className="text-blue-600">{s.value}</span>
+        <div className="grid grid-cols-2 gap-10 mb-10">
+          <div className="border border-slate-200 rounded-[2.5rem] p-8 bg-slate-50/20">
+            <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest mb-6">Volume por Especialidade</h4>
+            <div className="space-y-3">
+              {specialtyData.map(s => (
+                <div key={s.name} className="flex justify-between items-center text-[11px] font-bold border-b border-slate-100 pb-2">
+                  <span className="text-slate-600 uppercase">{s.name}</span>
+                  <span className="text-blue-800 font-black">{s.pacientes}</span>
                 </div>
               ))}
             </div>
           </div>
-          <div className="border border-slate-200 rounded-3xl p-4 bg-slate-50/30">
-            <h4 className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-4">Status Geral da Unidade</h4>
-            <div className="space-y-3">
+          <div className="border border-slate-200 rounded-[2.5rem] p-8 bg-slate-50/20">
+            <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest mb-6">Status dos Pacientes (%)</h4>
+            <div className="space-y-6">
               {statusPieData.map(s => (
-                <div key={s.name} className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }}></div>
+                <div key={s.name} className="flex items-center gap-4">
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: s.color }}></div>
                   <div className="flex-1">
-                    <p className="text-[7px] font-black text-slate-400 uppercase">{s.name}</p>
-                    <p className="text-[9px] font-black text-slate-800">{s.value} Pacientes ({stats.total > 0 ? ((s.value/stats.total)*100).toFixed(0) : 0}%)</p>
+                    <div className="flex justify-between items-end mb-1">
+                       <p className="text-[9px] font-black text-slate-400 uppercase">{s.name}</p>
+                       <p className="text-[11px] font-black text-slate-800">{s.value} Pac.</p>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                       <div className="h-full" style={{ backgroundColor: s.color, width: `${(s.value/stats.total)*100}%` }}></div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -238,34 +299,43 @@ const Dashboard: React.FC<DashboardProps> = ({ patients }) => {
           </div>
         </div>
 
-        <section className="border border-slate-200 rounded-[2rem] p-5 bg-white shadow-sm flex-1">
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-tighter">Análise de Gestão Inteligente</h3>
+        <section className="bg-slate-900 text-white p-10 rounded-[2.5rem] flex-1">
+          <div className="flex items-center gap-3 mb-6">
+            <Sparkles className="w-6 h-6 text-amber-400" />
+            <h3 className="text-xs font-black uppercase tracking-widest">Parecer de Inteligência Assistencial</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
-              <p className="text-[8px] font-black text-blue-600 uppercase mb-2">Relatório Situacional Objetivo</p>
-              <p className="text-[9px] font-bold text-blue-900 leading-relaxed text-justify">{aiAnalysis.summary}</p>
+          <div className="space-y-8">
+            <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+              <p className="text-[9px] font-black text-blue-400 uppercase mb-3 tracking-widest">Análise Situacional IA</p>
+              <p className="text-[12px] font-bold text-white/90 leading-relaxed text-justify italic">"{aiAnalysis.summary || "Relatório em processamento..."}"</p>
             </div>
-            <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
-              <p className="text-[8px] font-black text-emerald-600 uppercase mb-2">Propostas de Melhoria & Agilidade</p>
-              <ul className="space-y-2">
+            <div>
+              <p className="text-[9px] font-black text-emerald-400 uppercase mb-4 tracking-widest ml-1">Estratégias de Resolução de Fluxo</p>
+              <div className="grid grid-cols-3 gap-4">
                 {aiAnalysis.improvements.map((tip, i) => (
-                  <li key={i} className="text-[8px] font-bold text-emerald-900 flex items-start gap-1.5">
-                    <span className="text-emerald-500 font-black">•</span> {tip}
-                  </li>
+                  <div key={i} className="bg-white/5 p-4 rounded-2xl border border-white/10 text-[9px] font-black text-emerald-100 uppercase text-center leading-tight">
+                    {tip}
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           </div>
         </section>
 
-        <footer className="mt-6 pt-4 border-t border-slate-200 flex justify-between items-center text-[8px] font-black text-slate-400 uppercase tracking-widest">
-          <p>HospFlow Gestão Assistencial • v3.2</p>
+        <footer className="print-footer">
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            HospFlow • Sistema de Gestão Inteligente
+          </div>
           <div className="flex items-center gap-2">
-            <span>Marcos Araújo</span>
-            <Stethoscope className="w-4 h-4 text-emerald-600" />
+            <div className="flex flex-col items-center justify-center w-10 h-10">
+              <div className="relative">
+                <Stethoscope className="w-7 h-7 text-emerald-600" />
+                <div className="absolute -top-1 -right-1">
+                  <Sparkles className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                </div>
+              </div>
+              <span className="text-[7px] font-black text-slate-900 mt-0.5">MA</span>
+            </div>
           </div>
         </footer>
       </div>

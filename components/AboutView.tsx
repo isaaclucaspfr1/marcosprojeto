@@ -1,16 +1,33 @@
 
-import React, { useState } from 'react';
-import { Info, Mail, Send, ArrowLeft, Activity, User, ShieldCheck, HeartPulse, Stethoscope, Sparkles, Lock, Gavel, Scale } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Info, Mail, Send, ArrowLeft, Activity, User, ShieldCheck, Lock, Gavel, Scale, Stethoscope, Sparkles } from 'lucide-react';
 import { User as UserType } from '../types';
-import BrandLogo from './BrandLogo';
 
 interface AboutViewProps {
   user: UserType;
   onBack: () => void;
 }
+
+const MarcosAraujoLogo = ({ size = "w-14 h-14" }: { size?: string }) => (
+  <div className={`flex flex-col items-center justify-center ${size} group`}>
+    <div className="relative">
+      <Stethoscope className="w-full h-full text-emerald-500" />
+      <div className="absolute -top-1 -right-1">
+        <Sparkles className="w-1/2 h-1/2 text-yellow-400 animate-pulse fill-yellow-400" />
+      </div>
+    </div>
+    <span className="text-[10px] font-black text-slate-800 mt-0.5 tracking-tighter">MA</span>
+  </div>
+);
+
 const AboutView: React.FC<AboutViewProps> = ({ user, onBack }) => {
   const [feedback, setFeedback] = useState({ name: user.name, username: user.username, text: '' });
   const [sent, setSent] = useState(false);
+
+  // Garantir que a tela abra no topo desde o início
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,11 +43,23 @@ const AboutView: React.FC<AboutViewProps> = ({ user, onBack }) => {
       {/* Seção Principal: Sobre o App */}
       <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
         <div className="bg-slate-900 p-8 text-white">
-          <div className="flex items-center gap-4 mb-2">
-            <Info className="w-8 h-8 text-blue-500" />
-            <h2 className="text-2xl font-black tracking-tighter uppercase">Sobre o HospFlow</h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-blue-600/20 p-3 rounded-2xl">
+                <Info className="w-8 h-8 text-blue-500" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black tracking-tighter uppercase leading-none">Sobre o HospFlow</h2>
+                <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mt-1">Tecnologia e Gestão de Enfermagem</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:block border-r border-white/10 pr-4 mr-2">
+                 <p className="text-[8px] font-black text-white/40 uppercase tracking-widest text-right">Developer</p>
+              </div>
+              <MarcosAraujoLogo size="w-14 h-14" />
+            </div>
           </div>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Tecnologia, Ética e Segurança de Dados</p>
         </div>
         
         <div className="p-8 space-y-6 text-slate-700 leading-relaxed font-medium">
@@ -81,25 +110,28 @@ const AboutView: React.FC<AboutViewProps> = ({ user, onBack }) => {
           
           <div className="pt-10 border-t border-slate-100">
              <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                <div className="flex items-center gap-12">
+                <div className="flex items-center gap-8">
                    <div className="flex flex-col items-center">
-                      <div className="w-16 h-16 bg-blue-50 rounded-3xl border border-blue-100 flex items-center justify-center">
-                         <Activity className="w-10 h-10 text-blue-600" />
+                      <div className="w-14 h-14 bg-blue-50 rounded-2xl border border-blue-100 flex items-center justify-center">
+                         <Activity className="w-8 h-8 text-blue-600" />
                       </div>
-                      <p className="text-[10px] font-black text-blue-800 text-center mt-2 uppercase tracking-widest">HospFlow</p>
+                      <p className="text-[9px] font-black text-blue-800 text-center mt-2 uppercase tracking-widest">HospFlow</p>
                    </div>
                    
-                   <div className="h-16 w-px bg-slate-100 hidden md:block"></div>
+                   <div className="h-12 w-px bg-slate-100 hidden md:block"></div>
                    
-                   <BrandLogo size={96} />
+                   <div className="flex flex-col items-center">
+                     <MarcosAraujoLogo size="w-14 h-14" />
+                     <p className="text-[9px] font-black text-emerald-700 text-center mt-1 uppercase tracking-widest">Developer</p>
+                   </div>
                 </div>
                 
                 <div className="text-center md:text-right">
-                   <p className="text-sm font-black text-slate-900 mb-1">Desenvolvido por Marcos Araújo</p>
                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
                       <ShieldCheck className="w-3 h-3" />
                       <p className="text-[10px] font-black uppercase tracking-widest">Coren-MG 1299417</p>
                    </div>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase mt-2">© 2025 Marcos Araújo. Todos os Direitos Reservados.</p>
                 </div>
              </div>
           </div>

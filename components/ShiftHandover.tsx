@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Patient, Corridor } from '../types';
 import { CORRIDORS } from '../constants';
 import { GoogleGenAI } from "@google/genai";
-import { Send, Loader2, Sparkles, Printer, ClipboardList, ChevronRight } from 'lucide-react';
+import { Send, Loader2, Sparkles, Printer, ClipboardList, ChevronRight, Activity, Stethoscope } from 'lucide-react';
 
 interface ShiftHandoverProps {
   patients: Patient[];
@@ -111,18 +111,47 @@ const ShiftHandover: React.FC<ShiftHandoverProps> = ({ patients }) => {
         </div>
       )}
 
-      {/* Versão para Impressão */}
-      <div className="hidden print:block fixed inset-0 bg-white p-12 z-[9999]">
-         <div className="border-b-4 border-slate-900 pb-4 mb-8 flex justify-between items-end">
-            <div>
-               <h1 className="text-3xl font-black uppercase">Passagem de Plantão</h1>
-               <p className="font-bold text-slate-500 uppercase text-xs">{selectedCorridor} • Emitido por HospFlow IA</p>
+      {/* Versão para Impressão Padronizada */}
+      <div className="hidden print:block bg-white text-slate-900 p-0 font-sans" style={{ width: '210mm', minHeight: '297mm', margin: '0 auto', padding: '15mm' }}>
+         <style>{`
+           @page { size: A4; margin: 0; }
+           body { background: white !important; -webkit-print-color-adjust: exact; }
+           .print-header { border-bottom: 4px solid #0f172a; padding-bottom: 15px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+           .print-title { color: #1e3a8a; font-size: 36px; font-weight: 900; text-transform: uppercase; line-height: 1; letter-spacing: -1px; }
+           .print-footer { border-top: 2px solid #e2e8f0; padding-top: 15px; margin-top: 40px; display: flex; justify-content: space-between; align-items: center; }
+         `}</style>
+
+         <div className="print-header">
+            <div className="flex items-center gap-4">
+               <Activity className="w-14 h-14 text-[#1e3a8a]" />
+               <h1 className="print-title">HospFlow</h1>
             </div>
-            <p className="text-xs font-bold text-slate-400">{new Date().toLocaleString()}</p>
+            <div className="text-right">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Passagem de Plantão Inteligente</p>
+               <p className="font-bold text-sm text-slate-900">{selectedCorridor} • {new Date().toLocaleString('pt-BR')}</p>
+            </div>
          </div>
-         <div className="whitespace-pre-wrap text-sm leading-loose">
+
+         <div className="whitespace-pre-wrap text-sm leading-loose text-slate-800 font-medium bg-slate-50 p-8 rounded-[2rem] border border-slate-100 min-h-[150mm]">
             {summary}
          </div>
+
+         <footer className="print-footer">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+               HospFlow • Continuidade da Assistência
+            </div>
+            <div className="flex items-center gap-2">
+               <div className="flex flex-col items-center justify-center w-10 h-10">
+                 <div className="relative">
+                   <Stethoscope className="w-7 h-7 text-emerald-600" />
+                   <div className="absolute -top-1 -right-1">
+                     <Sparkles className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                   </div>
+                 </div>
+                 <span className="text-[7px] font-black text-slate-900 mt-0.5">MA</span>
+               </div>
+            </div>
+         </footer>
       </div>
     </div>
   );
