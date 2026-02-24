@@ -8,7 +8,7 @@ interface AboutViewProps {
   onBack: () => void;
 }
 
-const MarcosAraujoLogo = ({ size = "w-14 h-14" }: { size?: string }) => (
+const MALogo = ({ size = "w-14 h-14" }: { size?: string }) => (
   <div className={`flex flex-col items-center justify-center ${size} group`}>
     <div className="relative">
       <Stethoscope className="w-full h-full text-emerald-500" />
@@ -57,7 +57,7 @@ const AboutView: React.FC<AboutViewProps> = ({ user, onBack }) => {
               <div className="hidden sm:block border-r border-white/10 pr-4 mr-2">
                  <p className="text-[8px] font-black text-white/40 uppercase tracking-widest text-right">Developer</p>
               </div>
-              <MarcosAraujoLogo size="w-14 h-14" />
+              <MALogo size="w-14 h-14" />
             </div>
           </div>
         </div>
@@ -93,7 +93,7 @@ const AboutView: React.FC<AboutViewProps> = ({ user, onBack }) => {
                   <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Propriedade Intelectual</h4>
                </div>
                <p className="text-xs text-emerald-900 leading-relaxed">
-                  O HospFlow é de autoria e propriedade intelectual exclusiva do desenvolvedor <strong>Marcos Araújo</strong>. O projeto foi criado de forma <strong>independente e fora de qualquer vínculo empregatício</strong> ou obrigações contratuais com instituições terceiras.
+                  O HospFlow é de autoria e propriedade intelectual exclusiva do desenvolvedor <strong>MA</strong>. O projeto foi criado de forma <strong>independente e fora de qualquer vínculo empregatício</strong> ou obrigações contratuais com instituições terceiras.
                </p>
             </div>
           </div>
@@ -121,7 +121,7 @@ const AboutView: React.FC<AboutViewProps> = ({ user, onBack }) => {
                    <div className="h-12 w-px bg-slate-100 hidden md:block"></div>
                    
                    <div className="flex flex-col items-center">
-                     <MarcosAraujoLogo size="w-14 h-14" />
+                     <MALogo size="w-14 h-14" />
                      <p className="text-[9px] font-black text-emerald-700 text-center mt-1 uppercase tracking-widest">Developer</p>
                    </div>
                 </div>
@@ -131,7 +131,7 @@ const AboutView: React.FC<AboutViewProps> = ({ user, onBack }) => {
                       <ShieldCheck className="w-3 h-3" />
                       <p className="text-[10px] font-black uppercase tracking-widest">Coren-MG 1299417</p>
                    </div>
-                   <p className="text-[9px] font-bold text-slate-400 uppercase mt-2">© 2025 Marcos Araújo. Todos os Direitos Reservados.</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase mt-2">© 2025 MA. Todos os Direitos Reservados.</p>
                 </div>
              </div>
           </div>

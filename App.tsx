@@ -58,7 +58,7 @@ const safeLoad = (key: string) => {
   }
 };
 
-const MarcosAraujoLogo = React.memo(({ size = "w-14 h-14" }: { size?: string }) => (
+const MALogo = React.memo(({ size = "w-14 h-14" }: { size?: string }) => (
   <div className={`flex flex-col items-center justify-center ${size} group`}>
     <div className="relative">
       <Stethoscope className="w-full h-full text-emerald-500" />
@@ -69,6 +69,19 @@ const MarcosAraujoLogo = React.memo(({ size = "w-14 h-14" }: { size?: string }) 
     <span className="text-[10px] font-black text-slate-800 mt-0.5 tracking-tighter">MA</span>
   </div>
 ));
+
+const api = {
+  getPatients: () => fetch('/api/patients').then(r => r.json()),
+  savePatient: (p: Patient) => fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }),
+  deletePatient: (id: string) => fetch(`/api/patients/${id}`, { method: 'DELETE' }),
+  bulkDeletePatients: (ids: string[]) => fetch('/api/patients/bulk-delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) }),
+  getLeanPatients: () => fetch('/api/lean-patients').then(r => r.json()),
+  saveLeanPatient: (p: LeanPatient) => fetch('/api/lean-patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }),
+  deleteLeanPatient: (id: string) => fetch(`/api/lean-patients/${id}`, { method: 'DELETE' }),
+  getCollaborators: () => fetch('/api/collaborators').then(r => r.json()),
+  saveCollaborator: (c: Collaborator) => fetch('/api/collaborators', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) }),
+  deleteCollaborator: (id: string) => fetch(`/api/collaborators/${id}`, { method: 'DELETE' }),
+};
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(() => {
@@ -89,32 +102,33 @@ const App: React.FC = () => {
   const [scannedData, setScannedData] = useState<Partial<Patient> | null>(null);
   const [tempAuthUser, setTempAuthUser] = useState<Collaborator | null>(null);
   
-  const [patients, setPatients] = useState<Patient[]>(() => safeLoad('hospflow_patients_v5') || []);
-  const [leanPatients, setLeanPatients] = useState<LeanPatient[]>(() => safeLoad('hospflow_lean_v5') || []);
-  const [collaborators, setCollaborators] = useState<Collaborator[]>(() => {
-    const saved = safeLoad('hospflow_collabs_v5');
-    const defaultCollabs: Collaborator[] = [
-      { id: '1', name: 'Coordenador Geral', login: '5669', password: '387387', role: 'coordenacao', failedAttempts: 0, isBlocked: false, isDeleted: false },
-      { id: '2', name: 'Coordenação Setorial', login: '1010', password: '1234', role: 'coordenacao', failedAttempts: 0, isBlocked: false, isDeleted: false },
-      { id: '3', name: 'Técnico Exemplo', login: '456', password: '1234', role: 'tecnico', failedAttempts: 0, isBlocked: false, isDeleted: false }
-    ];
-    return saved || defaultCollabs;
-  });
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [leanPatients, setLeanPatients] = useState<LeanPatient[]>([]);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
-  // Otimização: Debounce no salvamento para evitar travamentos em cada edição
+  // Carregar dados iniciais do banco de dados
   useEffect(() => {
-    const timer = setTimeout(() => {
-      safeSave('hospflow_patients_v5', patients);
-      safeSave('hospflow_collabs_v5', collaborators);
-      safeSave('hospflow_lean_v5', leanPatients);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [patients, collaborators, leanPatients]);
+    const loadData = async () => {
+      try {
+        const [p, lp, c] = await Promise.all([
+          api.getPatients(),
+          api.getLeanPatients(),
+          api.getCollaborators()
+        ]);
+        setPatients(p);
+        setLeanPatients(lp);
+        setCollaborators(c);
+      } catch (e) {
+        console.error("Erro ao carregar dados do servidor:", e);
+      }
+    };
+    loadData();
+  }, []);
 
   useEffect(() => {
     const handleViewChange = (e: any) => setCurrentView(e.detail);
@@ -143,8 +157,11 @@ const App: React.FC = () => {
     }
     if (found.password === password) {
       const updatedCollabs = [...collaborators];
-      updatedCollabs[foundIndex] = { ...found, failedAttempts: 0 };
+      const updatedCollab = { ...found, failedAttempts: 0 };
+      updatedCollabs[foundIndex] = updatedCollab;
       setCollaborators(updatedCollabs);
+      api.saveCollaborator(updatedCollab);
+      
       if (password === '1234') {
         setTempAuthUser(found);
         setCurrentView('CHANGE_PASSWORD');
@@ -160,8 +177,11 @@ const App: React.FC = () => {
       const updatedCollabs = [...collaborators];
       const attempts = found.failedAttempts + 1;
       const blocked = attempts >= 3;
-      updatedCollabs[foundIndex] = { ...found, failedAttempts: attempts, isBlocked: blocked };
+      const updatedCollab = { ...found, failedAttempts: attempts, isBlocked: blocked };
+      updatedCollabs[foundIndex] = updatedCollab;
       setCollaborators(updatedCollabs);
+      api.saveCollaborator(updatedCollab);
+      
       if (blocked) alert("SENHA BLOQUEADA: Você errou a senha 3 vezes. Procure seu superior para resetar sua senha.");
       else alert(`SENHA INCORRETA: Tentativa ${attempts} de 3. Após 3 erros o usuário será bloqueado.`);
     }
@@ -174,10 +194,13 @@ const App: React.FC = () => {
     if (newPassword === '1234') { alert("Você não pode usar a senha padrão como sua nova senha."); return; }
     
     if (tempAuthUser) {
+      const updatedCollab = { ...tempAuthUser, password: newPassword, failedAttempts: 0, isBlocked: false };
       const updatedCollabs = collaborators.map(c => 
-        c.id === tempAuthUser.id ? { ...c, password: newPassword, failedAttempts: 0, isBlocked: false } : c
+        c.id === tempAuthUser.id ? updatedCollab : c
       );
       setCollaborators(updatedCollabs);
+      api.saveCollaborator(updatedCollab);
+      
       const authUser: User = { id: tempAuthUser.id, username: tempAuthUser.login, role: tempAuthUser.role, name: tempAuthUser.name };
       sessionStorage.setItem('hospflow_session_v5', btoa(encodeURIComponent(JSON.stringify(authUser))));
       setUser(authUser);
@@ -198,7 +221,7 @@ const App: React.FC = () => {
     setPassword('');
   }, []);
 
-  const addPatient = useCallback((p: Partial<Patient>) => {
+  const addPatient = useCallback(async (p: Partial<Patient>) => {
     const isUpa = p.status === 'Transferência UPA';
     const isAutoTransfer = isUpa || p.status === 'Transferência Externa';
     const newP: Patient = {
@@ -214,24 +237,43 @@ const App: React.FC = () => {
       isNew: true
     };
     setPatients(prev => [newP, ...prev].sort((a, b) => a.name.localeCompare(b.name)));
+    await api.savePatient(newP);
   }, [user]);
 
-  const updatePatient = useCallback((id: string, updates: Partial<Patient>) => {
-    setPatients(prev => prev.map(p => {
-      if (p.id === id) return { ...p, ...updates, lastModifiedBy: `${user?.username} - ${user?.name}` };
-      return p;
-    }).sort((a, b) => a.name.localeCompare(b.name)));
+  const updatePatient = useCallback(async (id: string, updates: Partial<Patient>) => {
+    let updatedP: Patient | undefined;
+    setPatients(prev => {
+      const newList = prev.map(p => {
+        if (p.id === id) {
+          updatedP = { ...p, ...updates, lastModifiedBy: `${user?.username} - ${user?.name}` };
+          return updatedP;
+        }
+        return p;
+      });
+      return [...newList].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    if (updatedP) await api.savePatient(updatedP);
   }, [user]);
 
-  const updatePatients = useCallback((ids: string[], updates: Partial<Patient>) => {
-    setPatients(prev => prev.map(p => {
-      if (ids.includes(p.id)) return { ...p, ...updates, lastModifiedBy: `${user?.username} - ${user?.name}` };
-      return p;
-    }).sort((a, b) => a.name.localeCompare(b.name)));
+  const updatePatients = useCallback(async (ids: string[], updates: Partial<Patient>) => {
+    const updatedList: Patient[] = [];
+    setPatients(prev => {
+      const newList = prev.map(p => {
+        if (ids.includes(p.id)) {
+          const newP = { ...p, ...updates, lastModifiedBy: `${user?.username} - ${user?.name}` };
+          updatedList.push(newP);
+          return newP;
+        }
+        return p;
+      });
+      return [...newList].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    for (const p of updatedList) await api.savePatient(p);
   }, [user]);
 
-  const deletePatients = useCallback((ids: string[]) => {
+  const deletePatients = useCallback(async (ids: string[]) => {
     setPatients(prev => prev.filter(p => !ids.includes(p.id)));
+    await api.bulkDeletePatients(ids);
   }, []);
 
   const renderContent = () => {
@@ -420,7 +462,7 @@ const App: React.FC = () => {
             
             <div className="flex flex-col items-center gap-2 mt-2">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Criado e Desenvolvido por:</span>
-              <MarcosAraujoLogo size="w-16 h-16" />
+              <MALogo size="w-16 h-16" />
             </div>
           </div>
         );
@@ -452,8 +494,27 @@ const App: React.FC = () => {
           </div>
         );
 
-      case 'LEAN_CADASTRO': return <LeanPatientForm onSave={(p) => { setLeanPatients([...leanPatients, p]); setCurrentView('LEAN_LIST'); }} onCancel={() => setCurrentView('LEAN_MENU')} />;
-      case 'LEAN_LIST': return <LeanPatientList patients={leanPatients} onUpdate={setLeanPatients} onCancel={() => setCurrentView('LEAN_MENU')} />;
+      case 'LEAN_CADASTRO': return <LeanPatientForm onSave={async (p) => { 
+        setLeanPatients(prev => [...prev, p]); 
+        await api.saveLeanPatient(p);
+        setCurrentView('LEAN_LIST'); 
+      }} onCancel={() => setCurrentView('LEAN_MENU')} />;
+      case 'LEAN_LIST': return <LeanPatientList patients={leanPatients} onUpdate={async (newList) => {
+        // Identificar o que mudou para sincronizar com o banco
+        if (newList.length < leanPatients.length) {
+          // Deleção
+          const deleted = leanPatients.find(p => !newList.some(np => np.id === p.id));
+          if (deleted) await api.deleteLeanPatient(deleted.id);
+        } else {
+          // Adição ou Edição
+          const changed = newList.find(np => {
+            const old = leanPatients.find(p => p.id === np.id);
+            return !old || JSON.stringify(old) !== JSON.stringify(np);
+          });
+          if (changed) await api.saveLeanPatient(changed);
+        }
+        setLeanPatients(newList);
+      }} onCancel={() => setCurrentView('LEAN_MENU')} />;
       case 'LEAN_NURSE_SUMMARY': return <LeanDashboard patients={leanPatients} unit={selectedUnit || ''} onCancel={() => setCurrentView('LEAN_MENU')} />;
       case 'CHANGE_PASSWORD': return (
         <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 flex-col">
@@ -499,7 +560,15 @@ const App: React.FC = () => {
       case 'FINALIZED_PATIENTS': return <TransferManager role={user?.role || 'tecnico'} patients={patients} onUpdatePatient={updatePatient} historyView onDeletePatients={deletePatients} />;
       case 'PENDENCIES': return <PendencyView patients={patients} onUpdatePatient={updatePatient} role={user?.role || 'tecnico'} />;
       case 'CLEAR_DATA': return <ClearDataView patients={patients} onDeletePatients={deletePatients} />;
-      case 'COLLABORATORS': return <CollaboratorManager user={user!} collaborators={collaborators} onUpdate={setCollaborators} onCancel={() => setCurrentView('MAIN_MENU')} />;
+      case 'COLLABORATORS': return <CollaboratorManager user={user!} collaborators={collaborators} onCancel={() => setCurrentView('MAIN_MENU')} onUpdate={async (newList) => {
+        // Sincronizar colaborador alterado
+        const changed = newList.find(nc => {
+          const old = collaborators.find(c => c.id === nc.id);
+          return !old || JSON.stringify(old) !== JSON.stringify(nc);
+        });
+        if (changed) await api.saveCollaborator(changed);
+        setCollaborators(newList);
+      }} />;
       case 'ABOUT_APP': return <AboutView user={user!} onBack={() => setCurrentView('MAIN_MENU')} />;
       case 'NEW_PATIENT': return <PatientForm onSave={(p) => { if (scannedData && scannedData.id) { updatePatient(scannedData.id, p); setScannedData(null); setCurrentView('PATIENT_LIST'); } else { addPatient(p); } }} onCancel={() => { setScannedData(null); setCurrentView('MAIN_MENU'); }} initialData={scannedData || undefined} />;
       default: return null;
