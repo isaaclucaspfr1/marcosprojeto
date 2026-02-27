@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/**/*.{ts,js}": {
+      "runtime": "nodejs22.x",
+      "includeFiles": "api/_db.js"
+    }
+  }
+}
